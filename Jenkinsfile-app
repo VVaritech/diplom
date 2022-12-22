@@ -1,0 +1,107 @@
+pipeline {
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '3'))
+    }
+    agent {
+    label 'kubernetes'
+    }    
+    tools {
+        maven 'Maven-3.8.6'
+    }
+    stages {
+        stage('Build') {
+            steps {
+                dir('maven-app') {
+                    sh "mvn -B -DskipTests clean package"
+                }
+            }
+        }
+        stage('Test app') {
+            steps {
+                dir('maven-app') {
+                    sh "mvn test"
+                }
+            }
+        }
+        stage('Copy artifact') {
+            steps {
+                dir('maven-app') {
+                    archiveArtifacts artifacts: '**/target/my-app-1.0-SNAPSHOT.jar', followSymlinks: false
+                    sh "ls -la"
+                }
+            }
+       }
+        stage("Docker build"){
+        agent {
+        label "slaves"
+        }
+        when {
+            branch 'main'
+        } 
+            steps {                
+                dir('maven-app') {                
+                sh 'docker version && docker build -t maven-app .'
+                sh 'docker image list'
+                sh 'docker tag maven-app mamicheck/maven-app:maven-app'
+                }
+            } 
+        }
+        stage("Docker Login") {
+        agent {
+            label "slaves"
+        }
+        when {
+            branch 'main'
+        }
+            steps {
+                withCredentials([string(credentialsId: 'DOCKERHUB_PASSWORD', variable: 'PASSWORD')]) {
+                sh 'docker login -u mamicheck -p $PASSWORD'
+                }
+            }
+        }
+        stage("Push Image to Docker Hub"){
+        agent {
+            label "slaves"
+        }
+        when {
+            branch 'main'
+        }            
+            steps {
+                sh 'docker push  mamicheck/maven-app:maven-app'
+            }
+        }   
+        stage("SSH Into k8s Server") {
+        agent {
+            label "slaves"
+        }
+         when {
+            branch 'main'
+        }    
+            steps {
+                script {
+                    def remote = [:]
+                    remote.name = 'master-node'
+                    remote.host = '10.0.0.10'
+                    remote.user = 'vagrant'
+                    remote.password = 'vagrant'
+                    remote.allowAnyHosts = true
+                    sshPut remote: remote, from: 'maven-deployment.yml', into: '.'        
+        stage('Put maven-deployment.yml onto master-node') {
+            sshPut remote: remote, from: 'maven-deployment.yml', into: '.'
+        }   
+        stage('Deploy App') {
+            sshCommand remote: remote, command: "kubectl apply -f maven-deployment.yml"
+        }
+                }     
+            }     
+        }
+    }
+        post {
+            always {
+            emailext to: "evgeniy.r92@gmail.com",
+            subject: "jenkins build:${currentBuild.currentResult}: ${env.JOB_NAME}",
+            body: "${currentBuild.currentResult}: Job ${env.JOB_NAME} from ${env.BRANCH_NAME}. Congratulation"
+        cleanWs()
+            }
+        }
+}

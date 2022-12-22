@@ -1,0 +1,43 @@
+
+
+
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: k8s-jenkins-slaves
+EOF
+
+
+
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-slaves-service-account
+  namespace: k8s-jenkins-slaves
+EOF
+
+
+cat <<EOF | kubectl apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-slaves-rolebinding
+  namespace: k8s-jenkins-slaves
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin
+subjects:                                                                                                                                                                     
+- kind: ServiceAccount                                                                                                                                                        
+  name: jenkins-slaves-service-account
+  namespace: k8s-jenkins-slaves
+EOF
+
+
+kubectl -n k8s-jenkins-slaves get secret "$(kubectl -n k8s-jenkins-slaves get sa jenkins-slaves-service-account -o jsonpath="{.secrets[0].name}")" -o go-template="{{.data.token | base64decode}}" >> /vagrant/configs/jenkins-token
+jenkins-slaves-service-account-token-c5g7h
+kubectl -n k8s-jenkins-slaves get secret jenkins-slaves-service-account-token-c5g7h -o jsonpath='{.data.token}' | base64 --decode
+
+eyJhbGciOiJSUzI1NiIsImtpZCI6IlU5MnVkeHM4akJ2U2hJUEpxVHljcFMtSnZSdW43YURlZmhQdk1rb2VZX2MifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrOHMtamVua2lucy1zbGF2ZXMiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlY3JldC5uYW1lIjoiamVua2lucy1zbGF2ZXMtc2VydmljZS1hY2NvdW50LXRva2VuLWM1ZzdoIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImplbmtpbnMtc2xhdmVzLXNlcnZpY2UtYWNjb3VudCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50LnVpZCI6IjFhNmQ0MWFjLTk5ZDgtNDM5Ny1iZWJiLTI1YzBiZGUyMTUxNSIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDprOHMtamVua2lucy1zbGF2ZXM6amVua2lucy1zbGF2ZXMtc2VydmljZS1hY2NvdW50In0.rGQna3QOouXpmI3M3OofKT7hKfjtV7fGpfXfnBS3og41Qb6ICog73apoxF5Gly_aOkYq2e9Cb6eCsjqroXraZVRIGMYe90NZBaWEE5-y1IdKeJkqETaaTJklqYqLhgH_kQPqlRYt3F-qRIxRTmTdDEK9vLAnYuCkaxk7bWduGgKSx1_L0gN6gDOr9aqQefyJnPbu1AjgPL63tyTa_jKMmIxCdsW0czuEF8vOLKRFiYof-aY5r-AvE6OEe2Wf8ZxqfemHdqGVXbOyuDsYzWurx5bcPaTd8Nn8qcdXodkJdtLW8aHyIJqvFhxKvPnP8CgED0tDgGqB-obkNxfM_cwrdA
